@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title><%= content_for(:title) || "Myapp" %></title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+     <style>
+      body {
+        margin: 0;
+        font-family: 'Segoe UI', sans-serif;
+        background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+        color: white;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100vh;
+        text-align: center;
+        overflow: hidden;
+      }
+
+      h1 {
+        font-size: 3em;
+        margin-bottom: 20px;
+        animation: slideIn 1s ease-out;
+      }
+
+      ul {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+      }
+
+      li {
+        background: rgba(255, 255, 255, 0.15);
+        margin: 10px 0;
+        padding: 15px 30px;
+        border-radius: 15px;
+        font-size: 1.5em;
+        transition: transform 0.3s ease, background 0.3s ease;
+      }
+
+      li:hover {
+        transform: scale(1.05);
+        background: rgba(255, 255, 255, 0.25);
+      }
+
+      @keyframes slideIn {
+        from {
+          transform: translateY(-40px);
+          opacity: 0;
+        }
+        to {
+          transform: translateY(0);
+          opacity: 1;
+        }
+      }
+
+      .footer {
+        position: absolute;
+        bottom: 20px;
+        font-size: 0.9em;
+        opacity: 0.7;
+      }
+
+      @media (max-width: 600px) {
+        h1 {
+          font-size: 2em;
+        }
+
+        li {
+          font-size: 1.2em;
+          padding: 10px 20px;
+        }
+      }
+    </style>
+    <%= csrf_meta_tags %>
+    <%= csp_meta_tag %>
+
+    <%= yield :head %>
+
+    <%# Enable PWA manifest for installable apps (make sure to enable in config/routes.rb too!) %>
+    <%#= tag.link rel: "manifest", href: pwa_manifest_path(format: :json) %>
+
+    <link rel="icon" href="/icon.png" type="image/png">
+    <link rel="icon" href="/icon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="/icon.png">
+
+    <%# Includes all stylesheet files in app/assets/stylesheets %>
+    <%= stylesheet_link_tag :app, "data-turbo-track": "reload" %>
+    <%= javascript_importmap_tags %>
+  </head>
+
+  <body>
+    <main class="mx-auto mt-28 px-5 flex">
+      <%= yield %>
+    </main>
+  </body>
+</html>
