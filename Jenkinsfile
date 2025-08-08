@@ -73,7 +73,7 @@ pipeline {
           # tunggu rollout sukses
           oc rollout status deploy/myapp-deployment -n ${OC_NAMESPACE} --timeout=3m || true
           # ambil route
-          oc get route myapp-deployment -n ${OC_NAMESPACE} -o jsonpath='{.spec.host}' > route.txt || true
+          oc get route myapp-route -n ${OC_NAMESPACE} -o jsonpath='{.spec.host}' > route.txt || true
         """
         script {
           ROUTE = readFile('route.txt').trim()
