@@ -71,9 +71,9 @@ pipeline {
         sh """
           with_retry=0
           # tunggu rollout sukses
-          oc rollout status deploy/myapp -n ${OC_NAMESPACE} --timeout=3m || true
+          oc rollout status deploy/myapp-deployment -n ${OC_NAMESPACE} --timeout=3m || true
           # ambil route
-          oc get route myapp -n ${OC_NAMESPACE} -o jsonpath='{.spec.host}' > route.txt || true
+          oc get route myapp-deployment -n ${OC_NAMESPACE} -o jsonpath='{.spec.host}' > route.txt || true
         """
         script {
           ROUTE = readFile('route.txt').trim()
@@ -90,16 +90,16 @@ pipeline {
    post {
      success {
        script {
-         def url = sh(script: "oc get route myapp -n ${env.OC_NAMESPACE} -o jsonpath='{.spec.host}' || true", returnStdout: true).trim()
+         def url = sh(script: "oc get route myapp-deployment -n ${env.OC_NAMESPACE} -o jsonpath='{.spec.host}' || true", returnStdout: true).trim()
          emailext subject: "[SUCCESS] rails-jenkins #${env.BUILD_NUMBER}",
                   body: "Build sukses. URL: https://${url}",
-                  to: "dev-team@example.com"
+                  to: "wiraardi79@gmail.com"
        }
      }
      failure {
        emailext subject: "[FAILED] rails-jenkins #${env.BUILD_NUMBER}",
                 body: "Build gagal. Cek console log Jenkins.",
-                to: "dev-team@example.com"
+                to: "wiraardi79@gmail.com"
      }
    }
 }
