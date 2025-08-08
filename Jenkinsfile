@@ -90,7 +90,7 @@ pipeline {
    post {
      success {
        script {
-         def url = sh(script: "oc get route myapp-deployment -n ${env.OC_NAMESPACE} -o jsonpath='{.spec.host}' || true", returnStdout: true).trim()
+         def url = sh(script: "oc get route myapp-route -n ${env.OC_NAMESPACE} -o jsonpath='{.spec.host}' || true", returnStdout: true).trim()
          emailext subject: "[SUCCESS] rails-jenkins #${env.BUILD_NUMBER}",
                   body: "Build sukses. URL: https://${url}",
                   to: "wiraardi79@gmail.com"
