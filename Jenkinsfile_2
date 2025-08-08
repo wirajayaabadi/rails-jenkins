@@ -1,6 +1,5 @@
 pipeline {
   agent any
-  options { ansiColor('xterm'); timestamps() }
 
   environment {
     REGISTRY      = "wiraaji2301"
@@ -24,37 +23,37 @@ pipeline {
       }
     }
 
-    // stage('Build docker image') {
-    //   steps {
-    //     script {
-    //       COMMIT = sh(script: "git rev-parse --short HEAD", returnStdout: true).trim()
-    //       env.IMG_TAG = "build-${env.BUILD_NUMBER}-${COMMIT}"
-    //     }
-    //     sh """
-    //       docker build -t ${REGISTRY}/${IMAGE_NAME}:${IMG_TAG} .
-    //     """
-    //   }
-    // }
+    stage('Build docker image') {
+      steps {
+        script {
+          COMMIT = sh(script: "git rev-parse --short HEAD", returnStdout: true).trim()
+          env.IMG_TAG = "build-${env.BUILD_NUMBER}-${COMMIT}"
+        }
+        sh """
+          docker build -t ${REGISTRY}/${IMAGE_NAME}:${IMG_TAG} .
+        """
+      }
+    }
 
-    // stage('Push docker') {
-    //   steps {
-    //     withCredentials([usernamePassword(credentialsId: DOCKER_CRED, usernameVariable: 'USER', passwordVariable: 'PASS')]) {
-    //       sh """
-    //         echo "$PASS" | docker login ${REGISTRY} -u "$USER" --password-stdin
-    //         docker push ${REGISTRY}/${IMAGE_NAME}:${IMG_TAG}
-    //       """
-    //     }
-    //   }
-    // }
+    stage('Push docker') {
+      steps {
+        withCredentials([usernamePassword(credentialsId: DOCKER_CRED, usernameVariable: 'USER', passwordVariable: 'PASS')]) {
+          sh """
+            echo "$PASS" | docker login ${REGISTRY} -u "$USER" --password-stdin
+            docker push ${REGISTRY}/${IMAGE_NAME}:${IMG_TAG}
+          """
+        }
+      }
+    }
 
-    // stage('Update manifest') {
-    //   steps {
-    //     sh """
-    //       cp myapp.yml myapp.rendered.yml
-    //       sed -i 's#image: .*#image: ${REGISTRY}/${IMAGE_NAME}:${IMG_TAG}#' myapp.rendered.yml
-    //     """
-    //   }
-    // }
+    stage('Update manifest') {
+      steps {
+        sh """
+          cp myapp.yml myapp.rendered.yml
+          sed -i 's#image: .*#image: ${REGISTRY}/${IMAGE_NAME}:${IMG_TAG}#' myapp.rendered.yml
+        """
+      }
+    }
 
     // stage('oc apply') {
     //   steps {
