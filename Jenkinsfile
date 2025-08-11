@@ -6,6 +6,8 @@ pipeline {
     IMAGE_NAME    = "myapp-amd64"
     DOCKER_CRED   = "dockerhub-creds"
     GIT_CRED      = "github-creds"
+    OC_SERVER     = "https://api.rm2.thpm.p1.openshiftapps.com:6443" 
+    OC_NAMESPACE  = "wirajayaabadi-dev" // ganti project
     DOCKER_BUILDKIT = "1"
   }
 
@@ -95,16 +97,17 @@ pipeline {
         script {
           withCredentials([string(credentialsId: 'oc-token-1', variable: 'OC_TOKEN')]) {
             sh """
-              oc login ${c.server} --token="${OC_TOKEN}" --insecure-skip-tls-verify=true
+              oc login ${OC_SERVER} --token="${OC_TOKEN}" --insecure-skip-tls-verify=true
               oc apply -f myapp-haproxy.yml
-              oc rollout status deploy/haproxy-deployment -n ${c.ns} --timeout=3m
-              oc get route haproxy-deployment -o jsonpath='{.spec.host}' > route-${c.name}.txt || true
+              oc rollout status deploy/haproxy -n ${OC_NAMESPACE} --timeout=3m
+              oc get route myapp-route -o jsonpath='{.spec.host}' > route-${OC_NAMESPACE}.txt || true
               oc logout || true
             """
+          }
         }
       }
     }
-
+    
     stage('Show all routes') {
       steps {
         script {
