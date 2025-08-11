@@ -99,8 +99,8 @@ pipeline {
             sh """
               oc login ${OC_SERVER} --token="${OC_TOKEN}" --insecure-skip-tls-verify=true
               oc apply -n wirajayaabadi-dev -f myapp-haproxy.yml
-              oc rollout status deploy/haproxy -n ${OC_NAMESPACE} --timeout=3m
-              oc get route myapp-route -o jsonpath='{.spec.host}' > route-${OC_NAMESPACE}.txt || true
+              # oc rollout status deploy/haproxy -n ${OC_NAMESPACE} --timeout=3m
+              # oc get route myapp-route -o jsonpath='{.spec.host}' > route-${OC_NAMESPACE}.txt || true
               oc logout || true
             """
           }
