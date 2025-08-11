@@ -105,21 +105,18 @@ pipeline {
   }
 
   post {
-    success {
-      script {
-        def urls = sh(script: "for f in route-*.txt 2>/dev/null; do echo \"$(basename $f .txt): https://$(cat $f)\"; done", returnStdout: true).trim()
-        emailext subject: "[SUCCESS] rails-jenkins #${env.BUILD_NUMBER}",
-                 body: urls ? "Build sukses. URL:\n${urls}" : "Build sukses, tapi route belum terdeteksi.",
-                 to: "wiraardi79@gmail.com"
-      }
-    }
-    failure {
-      emailext subject: "[FAILED] rails-jenkins #${env.BUILD_NUMBER}",
-               body: "Build gagal. Cek console log Jenkins.",
-               to: "wiraardi79@gmail.com"
-    }
-    always {
-      cleanWs()
-    }
-  }
+     success {
+       script {
+         def url = sh(script: "oc get route myapp-route -n ${env.OC_NAMESPACE} -o jsonpath='{.spec.host}' || true", returnStdout: true).trim()
+         emailext subject: "[SUCCESS] rails-jenkins #${env.BUILD_NUMBER}",
+                  body: "Build sukses. URL: https://${url}",
+                  to: "wiraardi79@gmail.com"
+       }
+     }
+     failure {
+       emailext subject: "[FAILED] rails-jenkins #${env.BUILD_NUMBER}",
+                body: "Build gagal. Cek console log Jenkins.",
+                to: "wiraardi79@gmail.com"
+     }
+   }
 }
