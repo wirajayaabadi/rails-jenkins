@@ -1,3 +1,54 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: haproxy-config
+  labels:
+    app: haproxy
+data:
+  haproxy.cfg: |
+    global
+      log stdout format raw local0
+      daemon
+
+    defaults
+      mode http
+      log global
+      option httplog
+      timeout connect 5s
+      timeout client  60s
+      timeout server  60s
+
+    # Expose a simple health endpoint on /healthz
+    frontend http_front
+      bind *:8080
+      acl is_health path_beg /healthz
+      http-request return status 200 content-type text/plain string "ok" if is_health
+      default_backend web_backends
+
+    backend web_backends
+      balance roundrobin
+      option httpchk GET /
+      http-check expect status 200-399
+      # Use cluster DNS for dynamic resolution (adjust IP if your cluster DNS differs)
+      resolvers osdns
+        nameserver dns1 172.30.0.10:53  # OpenShift default cluster-dns
+        hold valid 10s
+        resolve_retries       3
+        timeout resolve       5s
+        timeout retry         5s
+      # General health-check settings
+      default-server check inter 3s fall 2 rise 2 init-addr last,libc,none
+
+      # --- HTTPS backends via OpenShift Routes ---
+      # We connect to 443 with SNI set to each route host. We skip cert validation since these are public route certs that may rotate.
+      server s1 myapp-route-wirajayaabadi-dev.apps.rm2.thpm.p1.openshiftapps.com:443 ssl verify none sni str(myapp-route-wirajayaabadi-dev.apps.rm2.thpm.p1.openshiftapps.com) resolvers osdns
+      server s2 myapp-route-biruswasana-dev.apps.rm1.0a51.p1.openshiftapps.com:443 ssl verify none sni str(myapp-route-biruswasana-dev.apps.rm1.0a51.p1.openshiftapps.com) resolvers osdns
+      server s3 myapp-route-fchbrnn-dev.apps.rm1.0a51.p1.openshiftapps.com:443 ssl verify none sni str(myapp-route-fchbrnn-dev.apps.rm1.0a51.p1.openshiftapps.com) resolvers osdns
+      server s4 myapp-route-dianmatondang012-dev.apps.rm1.0a51.p1.openshiftapps.com:443 ssl verify none sni str(myapp-route-dianmatondang012-dev.apps.rm1.0a51.p1.openshiftapps.com) resolvers osdns
+      server s5 myapp-route-rafyryana-dev.apps.rm1.0a51.p1.openshiftapps.com:443 ssl verify none sni str(myapp-route-rafyryana-dev.apps.rm1.0a51.p1.openshiftapps.com) resolvers osdns
+
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -5,113 +56,57 @@ metadata:
   labels:
     app: haproxy
 spec:
-  replicas: 1
+  replicas: 2
   selector:
     matchLabels:
       app: haproxy
-  strategy:
-    type: RollingUpdate
-    rollingUpdate:
-      maxUnavailable: 0
-      maxSurge: 1
   template:
     metadata:
       labels:
         app: haproxy
-      # trik sederhana agar pod rolling saat ConfigMap berubah (ubah value ini saat update)
-      annotations:
-        config/hash: 'v1'
     spec:
-      automountServiceAccountToken: false
-      terminationGracePeriodSeconds: 20
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
       containers:
         - name: haproxy
-          image: haproxy:2.9
+          image: haproxy:2.9-alpine
           imagePullPolicy: IfNotPresent
+          args: ['-f', '/usr/local/etc/haproxy/haproxy.cfg', '-db']
           ports:
             - name: http
               containerPort: 8080
-          # liveness/readiness: sederhana & aman
-          livenessProbe:
-            tcpSocket: { port: 8080 }
-            initialDelaySeconds: 5
-            periodSeconds: 10
           readinessProbe:
             httpGet:
-              path: /
+              path: /healthz
               port: 8080
-            initialDelaySeconds: 5
+            initialDelaySeconds: 3
             periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 10
           resources:
             requests:
               cpu: 50m
               memory: 64Mi
             limits:
-              cpu: 200m
+              cpu: 500m
               memory: 256Mi
-          securityContext:
-            runAsNonRoot: true
-            runAsUser: 1001
-            allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: true
-            capabilities:
-              drop: ['ALL']
           volumeMounts:
-            - name: haproxy-config-volume
-              mountPath: /usr/local/etc/haproxy/haproxy.cfg
-              subPath: haproxy.cfg
+            - name: haproxy-config
+              mountPath: /usr/local/etc/haproxy
+          securityContext:
+            allowPrivilegeEscalation: false
       volumes:
-        - name: haproxy-config-volume
+        - name: haproxy-config
           configMap:
             name: haproxy-config
-
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: haproxy-config
-data:
-  haproxy.cfg: |
-    global
-        log stdout format raw local0
-
-    defaults
-        mode http
-        option forwardfor
-        timeout connect 5s
-        timeout client  50s
-        timeout server  50s
-
-    resolvers mydns
-        nameserver dns1 8.8.8.8:53
-        hold valid 10s
-
-    frontend http_front
-        bind *:8080
-        default_backend web_backends
-
-    backend web_backends
-        balance roundrobin
-        option httpchk
-        http-check connect ssl alpn h2,http/1.1
-        http-check send meth GET uri /pages/hello ver HTTP/1.1
-
-        default-server check ssl verify none sni req.hdr(Host) resolvers mydns \
-                      init-addr last,libc,none
-
-        # Pakai Host header sesuai route masing-masing:
-        http-request set-header Host myapp-route-wirajayaabadi-dev.apps.rm2.thpm.p1.openshiftapps.com if { srv_id eq 1 }
-        http-request set-header Host myapp-route-biruswasana-dev.apps.rm1.0a51.p1.openshiftapps.com    if { srv_id eq 2 }
-        http-request set-header Host myapp-route-fchbrnn-dev.apps.rm1.0a51.p1.openshiftapps.com        if { srv_id eq 3 }
-        http-request set-header Host myapp-route-dianmatondang012-dev.apps.rm1.0a51.p1.openshiftapps.com if { srv_id eq 4 }
-        http-request set-header Host myapp-route-rafyryana-dev.apps.rm1.0a51.p1.openshiftapps.com      if { srv_id eq 5 }
-
-        server hb1 myapp-route-wirajayaabadi-dev.apps.rm2.thpm.p1.openshiftapps.com:443
-        server hb2 myapp-route-biruswasana-dev.apps.rm1.0a51.p1.openshiftapps.com:443
-        server hb3 myapp-route-fchbrnn-dev.apps.rm1.0a51.p1.openshiftapps.com:443
-        server hb4 myapp-route-dianmatondang012-dev.apps.rm1.0a51.p1.openshiftapps.com:443
-        server hb5 myapp-route-rafyryana-dev.apps.rm1.0a51.p1.openshiftapps.com:443
-
+            items:
+              - key: haproxy.cfg
+                path: haproxy.cfg
 ---
 apiVersion: v1
 kind: Service
@@ -122,9 +117,25 @@ metadata:
 spec:
   selector:
     app: haproxy
-  type: ClusterIP
   ports:
     - name: http
-      protocol: TCP
-      port: 80
+      port: 8080
       targetPort: 8080
+---
+# Optional: expose via OpenShift Route (edge-terminated TLS to HAProxy service)
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: haproxy
+  labels:
+    app: haproxy
+spec:
+  # host: custom-haproxy.<your-domain>   # (optional) set a custom host if you want a fixed URL
+  to:
+    kind: Service
+    name: haproxy
+  port:
+    targetPort: http
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
