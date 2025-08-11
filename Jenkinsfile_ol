@@ -51,6 +51,8 @@ pipeline {
       }
     }
 
+    // commit
+
     stage('oc apply') {
       steps {
         withCredentials([string(credentialsId: OC_TOKEN_ID, variable: 'OC_TOKEN')]) {
