@@ -37,7 +37,7 @@ pipeline {
                 echo "\$PASS" | docker login -u "\$USER" --password-stdin
                 docker push ${REGISTRY}/${IMAGE_NAME}:${IMG_TAG}
                 # optional: jaga tag penanda stabil
-                docker tag ${REGISTRY}/${IMAGE_NAME}:${IMG_TAG} ${REGISTRY}/${IMAGE_NAME}:latest
+                # docker tag ${REGISTRY}/${IMAGE_NAME}:${IMG_TAG} ${REGISTRY}/${IMAGE_NAME}:latest
                 docker push ${REGISTRY}/${IMAGE_NAME}:latest || true
               """
             } finally {
@@ -57,10 +57,9 @@ pipeline {
       }
     }
 
-    stage('Deploy to all clusters') {
+    stage('Deploy to all clusters (sequential)') {
       steps {
         script {
-          // Definisi cluster (pakai env.* yang sudah kamu set di environment block)
           def clusters = [
             [name: 'cluster-1', tokenId: 'oc-token-1', server: 'https://api.rm2.thpm.p1.openshiftapps.com:6443', ns: 'wirajayaabadi-dev'],
             [name: 'cluster-2', tokenId: 'oc-token-2', server: 'https://api.rm1.0a51.p1.openshiftapps.com:6443', ns: 'biruswasana-dev'],
@@ -69,23 +68,39 @@ pipeline {
             [name: 'cluster-5', tokenId: 'oc-token-5', server: 'https://api.rm1.0a51.p1.openshiftapps.com:6443', ns: 'rafyryana-dev'],
           ]
 
-          def branches = clusters.collectEntries { c ->
-            ["Deploy ${c.name}": {
-              withCredentials([string(credentialsId: c.tokenId, variable: 'OC_TOKEN')]) {
+          for (c in clusters) {
+            echo "===> Deploy ${c.name}"
+            withCredentials([string(credentialsId: c.tokenId, variable: 'OC_TOKEN')]) {
+              // isolasi config + pakai -n (tanpa `oc project`)
+              withEnv(["KUBECONFIG=${env.WORKSPACE}/kubeconfig-${c.name}",
+                      "HOME=${env.WORKSPACE}/home-${c.name}"]) {
                 sh """
-                  oc login ${c.server} --token=${OC_TOKEN} --insecure-skip-tls-verify=true
-                  oc project ${c.ns}
-                  oc apply -f myapp-secret.yml || true
-                  oc apply -f myapp.rendered.yml
-                  oc rollout status deploy/myapp-deployment -n ${c.ns} --timeout=3m
-                  oc get route myapp-route -n ${c.ns} -o jsonpath='{.spec.host}' > route-${c.name}.txt || true
-                  oc logout
+                  mkdir -p "\$HOME"
+                  oc login ${c.server} --token="${OC_TOKEN}" --insecure-skip-tls-verify=true
+                  oc apply -n ${c.ns} -f myapp-secret.yml || true
+                  oc apply -n ${c.ns} -f myapp.rendered.yml
+                  oc rollout status -n ${c.ns} deploy/myapp-deployment --timeout=3m
+                  oc get route -n ${c.ns} myapp-route -o jsonpath='{.spec.host}' > route-${c.name}.txt || true
+                  oc logout || true
                 """
               }
-            }]
+            }
           }
+        }
+      }
+    }
 
-          parallel branches
+    stage('Deploy haproxy') {
+      steps {
+        script {
+          withCredentials([string(credentialsId: 'oc-token-1', variable: 'OC_TOKEN')]) {
+            sh """
+              oc login ${c.server} --token="${OC_TOKEN}" --insecure-skip-tls-verify=true
+              oc apply -f myapp-haproxy.yml
+              oc rollout status deploy/haproxy-deployment -n ${c.ns} --timeout=3m
+              oc get route haproxy-deployment -o jsonpath='{.spec.host}' > route-${c.name}.txt || true
+              oc logout || true
+            """
         }
       }
     }

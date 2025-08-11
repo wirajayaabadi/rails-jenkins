@@ -1,0 +1,70 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: haproxy
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: haproxy
+  template:
+    metadata:
+      labels:
+        app: haproxy
+    spec:
+      containers:
+        - name: haproxy
+          image: bitnami/haproxy:latest
+          ports:
+            - containerPort: 8080
+          volumeMounts:
+            - name: haproxy-config-volume
+              mountPath: /bitnami/haproxy/conf/haproxy.cfg
+              subPath: haproxy.cfg
+      volumes:
+        - name: haproxy-config-volume
+          configMap:
+            name: haproxy-config
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: haproxy-config
+data:
+  haproxy.cfg: |
+    global
+        log stdout format raw local0
+
+    defaults
+        mode http
+        timeout connect 5s
+        timeout client  50s
+        timeout server  50s
+
+    frontend http_front
+        bind *:8080
+        default_backend web_backends
+
+    backend web_backends
+        balance roundrobin
+        option httpchk GET /status/200
+        server hb1 httpbin.org:80 resolvers mydns
+        server hb2 httpbin.org:80 resolvers mydns
+
+    resolvers mydns
+        nameserver dns1 8.8.8.8:53
+        hold valid 10s
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: haproxy
+spec:
+  selector:
+    app: haproxy
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8080
