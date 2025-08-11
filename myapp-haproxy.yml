@@ -92,31 +92,25 @@ data:
 
     backend web_backends
         balance roundrobin
-        option httpchk GET /pages/hello
-        server hb1 myapp-route-wirajayaabadi-dev.apps.rm2.thpm.p1.openshiftapps.com:443 \
-            ssl sni str(myapp-route-wirajayaabadi-dev.apps.rm2.thpm.p1.openshiftapps.com) \
-            verify none check resolvers mydns
-        http-check set-header Host myapp-route-wirajayaabadi-dev.apps.rm2.thpm.p1.openshiftapps.com
+        option httpchk
+        http-check connect ssl alpn h2,http/1.1
+        http-check send meth GET uri /pages/hello ver HTTP/1.1
 
-        server hb2 myapp-route-biruswasana-dev.apps.rm1.0a51.p1.openshiftapps.com:443 \
-            ssl sni str(myapp-route-biruswasana-dev.apps.rm1.0a51.p1.openshiftapps.com) \
-            verify none check resolvers mydns
-        http-check set-header Host myapp-route-biruswasana-dev.apps.rm1.0a51.p1.openshiftapps.com
+        default-server check ssl verify none sni req.hdr(Host) resolvers mydns \
+                      init-addr last,libc,none
 
-        server hb3 myapp-route-fchbrnn-dev.apps.rm1.0a51.p1.openshiftapps.com:443 \
-            ssl sni str(myapp-route-fchbrnn-dev.apps.rm1.0a51.p1.openshiftapps.com) \
-            verify none check resolvers mydns
-        http-check set-header Host myapp-route-fchbrnn-dev.apps.rm1.0a51.p1.openshiftapps.com
+        # Pakai Host header sesuai route masing-masing:
+        http-request set-header Host myapp-route-wirajayaabadi-dev.apps.rm2.thpm.p1.openshiftapps.com if { srv_id eq 1 }
+        http-request set-header Host myapp-route-biruswasana-dev.apps.rm1.0a51.p1.openshiftapps.com    if { srv_id eq 2 }
+        http-request set-header Host myapp-route-fchbrnn-dev.apps.rm1.0a51.p1.openshiftapps.com        if { srv_id eq 3 }
+        http-request set-header Host myapp-route-dianmatondang012-dev.apps.rm1.0a51.p1.openshiftapps.com if { srv_id eq 4 }
+        http-request set-header Host myapp-route-rafyryana-dev.apps.rm1.0a51.p1.openshiftapps.com      if { srv_id eq 5 }
 
-        server hb4 myapp-route-dianmatondang012-dev.apps.rm1.0a51.p1.openshiftapps.com:443 \
-            ssl sni str(myapp-route-dianmatondang012-dev.apps.rm1.0a51.p1.openshiftapps.com) \
-            verify none check resolvers mydns
-        http-check set-header Host myapp-route-dianmatondang012-dev.apps.rm1.0a51.p1.openshiftapps.com
-
-        server hb5 myapp-route-rafyryana-dev.apps.rm1.0a51.p1.openshiftapps.com:443 \
-            ssl sni str(myapp-route-rafyryana-dev.apps.rm1.0a51.p1.openshiftapps.com) \
-            verify none check resolvers mydns
-        http-check set-header Host myapp-route-rafyryana-dev.apps.rm1.0a51.p1.openshiftapps.com
+        server hb1 myapp-route-wirajayaabadi-dev.apps.rm2.thpm.p1.openshiftapps.com:443
+        server hb2 myapp-route-biruswasana-dev.apps.rm1.0a51.p1.openshiftapps.com:443
+        server hb3 myapp-route-fchbrnn-dev.apps.rm1.0a51.p1.openshiftapps.com:443
+        server hb4 myapp-route-dianmatondang012-dev.apps.rm1.0a51.p1.openshiftapps.com:443
+        server hb5 myapp-route-rafyryana-dev.apps.rm1.0a51.p1.openshiftapps.com:443
 
 ---
 apiVersion: v1
