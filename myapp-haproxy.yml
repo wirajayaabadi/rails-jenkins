@@ -2,24 +2,63 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: haproxy
+  labels:
+    app: haproxy
 spec:
   replicas: 1
   selector:
     matchLabels:
       app: haproxy
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
   template:
     metadata:
       labels:
         app: haproxy
+      # trik sederhana agar pod rolling saat ConfigMap berubah (ubah value ini saat update)
+      annotations:
+        config/hash: 'v1'
     spec:
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 20
       containers:
         - name: haproxy
-          image: bitnami/haproxy:latest
+          image: haproxy:2.9
+          imagePullPolicy: IfNotPresent
           ports:
-            - containerPort: 8080
+            - name: http
+              containerPort: 8080
+          # liveness/readiness: sederhana & aman
+          livenessProbe:
+            tcpSocket: { port: 8080 }
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1001
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ['ALL']
           volumeMounts:
             - name: haproxy-config-volume
-              mountPath: /bitnami/haproxy/conf/haproxy.cfg
+              mountPath: /usr/local/etc/haproxy/haproxy.cfg
               subPath: haproxy.cfg
       volumes:
         - name: haproxy-config-volume
@@ -38,9 +77,14 @@ data:
 
     defaults
         mode http
+        option forwardfor
         timeout connect 5s
         timeout client  50s
         timeout server  50s
+
+    resolvers mydns
+        nameserver dns1 8.8.8.8:53
+        hold valid 10s
 
     frontend http_front
         bind *:8080
@@ -52,19 +96,19 @@ data:
         server hb1 httpbin.org:80 resolvers mydns
         server hb2 httpbin.org:80 resolvers mydns
 
-    resolvers mydns
-        nameserver dns1 8.8.8.8:53
-        hold valid 10s
-
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: haproxy
+  labels:
+    app: haproxy
 spec:
   selector:
     app: haproxy
+  type: ClusterIP
   ports:
-    - protocol: TCP
+    - name: http
+      protocol: TCP
       port: 80
       targetPort: 8080
