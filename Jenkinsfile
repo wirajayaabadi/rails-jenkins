@@ -25,7 +25,7 @@ pipeline {
           env.IMG_TAG = "build-${env.BUILD_NUMBER}-${commit}"
         }
         sh """
-          docker build --platform=linux/amd64 -t ${REGISTRY}/${IMAGE_NAME}:${IMG_TAG} .
+          # docker build --platform=linux/amd64 -t ${REGISTRY}/${IMAGE_NAME}:${IMG_TAG} .
         """
       }
     }
@@ -37,10 +37,10 @@ pipeline {
             try {
               sh """
                 echo "\$PASS" | docker login -u "\$USER" --password-stdin
-                docker push ${REGISTRY}/${IMAGE_NAME}:${IMG_TAG}
+                # docker push ${REGISTRY}/${IMAGE_NAME}:${IMG_TAG}
                 # optional: jaga tag penanda stabil
                 # docker tag ${REGISTRY}/${IMAGE_NAME}:${IMG_TAG} ${REGISTRY}/${IMAGE_NAME}:latest
-                docker push ${REGISTRY}/${IMAGE_NAME}:latest || true
+                # docker push ${REGISTRY}/${IMAGE_NAME}:latest || true
               """
             } finally {
               sh 'docker logout || true'
@@ -59,38 +59,38 @@ pipeline {
       }
     }
 
-    stage('Deploy to all clusters (sequential)') {
-      steps {
-        script {
-          def clusters = [
-            [name: 'cluster-1', tokenId: 'oc-token-1', server: 'https://api.rm2.thpm.p1.openshiftapps.com:6443', ns: 'wirajayaabadi-dev'],
-            [name: 'cluster-2', tokenId: 'oc-token-2', server: 'https://api.rm1.0a51.p1.openshiftapps.com:6443', ns: 'biruswasana-dev'],
-            [name: 'cluster-3', tokenId: 'oc-token-3', server: 'https://api.rm1.0a51.p1.openshiftapps.com:6443', ns: 'fchbrnn-dev'],
-            [name: 'cluster-4', tokenId: 'oc-token-4', server: 'https://api.rm1.0a51.p1.openshiftapps.com:6443', ns: 'dianmatondang012-dev'],
-            [name: 'cluster-5', tokenId: 'oc-token-5', server: 'https://api.rm1.0a51.p1.openshiftapps.com:6443', ns: 'rafyryana-dev'],
-          ]
+    // stage('Deploy to all clusters (sequential)') {
+    //   steps {
+    //     script {
+    //       def clusters = [
+    //         [name: 'cluster-1', tokenId: 'oc-token-1', server: 'https://api.rm2.thpm.p1.openshiftapps.com:6443', ns: 'wirajayaabadi-dev'],
+    //         [name: 'cluster-2', tokenId: 'oc-token-2', server: 'https://api.rm1.0a51.p1.openshiftapps.com:6443', ns: 'biruswasana-dev'],
+    //         [name: 'cluster-3', tokenId: 'oc-token-3', server: 'https://api.rm1.0a51.p1.openshiftapps.com:6443', ns: 'fchbrnn-dev'],
+    //         [name: 'cluster-4', tokenId: 'oc-token-4', server: 'https://api.rm1.0a51.p1.openshiftapps.com:6443', ns: 'dianmatondang012-dev'],
+    //         [name: 'cluster-5', tokenId: 'oc-token-5', server: 'https://api.rm1.0a51.p1.openshiftapps.com:6443', ns: 'rafyryana-dev'],
+    //       ]
 
-          for (c in clusters) {
-            echo "===> Deploy ${c.name}"
-            withCredentials([string(credentialsId: c.tokenId, variable: 'OC_TOKEN')]) {
-              // isolasi config + pakai -n (tanpa `oc project`)
-              withEnv(["KUBECONFIG=${env.WORKSPACE}/kubeconfig-${c.name}",
-                      "HOME=${env.WORKSPACE}/home-${c.name}"]) {
-                sh """
-                  mkdir -p "\$HOME"
-                  oc login ${c.server} --token="${OC_TOKEN}" --insecure-skip-tls-verify=true
-                  oc apply -n ${c.ns} -f myapp-secret.yml || true
-                  oc apply -n ${c.ns} -f myapp.rendered.yml
-                  oc rollout status -n ${c.ns} deploy/myapp-deployment --timeout=3m
-                  oc get route -n ${c.ns} myapp-route -o jsonpath='{.spec.host}' > route-${c.name}.txt || true
-                  oc logout || true
-                """
-              }
-            }
-          }
-        }
-      }
-    }
+    //       for (c in clusters) {
+    //         echo "===> Deploy ${c.name}"
+    //         withCredentials([string(credentialsId: c.tokenId, variable: 'OC_TOKEN')]) {
+    //           // isolasi config + pakai -n (tanpa `oc project`)
+    //           withEnv(["KUBECONFIG=${env.WORKSPACE}/kubeconfig-${c.name}",
+    //                   "HOME=${env.WORKSPACE}/home-${c.name}"]) {
+    //             sh """
+    //               mkdir -p "\$HOME"
+    //               oc login ${c.server} --token="${OC_TOKEN}" --insecure-skip-tls-verify=true
+    //               oc apply -n ${c.ns} -f myapp-secret.yml || true
+    //               oc apply -n ${c.ns} -f myapp.rendered.yml
+    //               # oc rollout status -n ${c.ns} deploy/myapp-deployment --timeout=3m
+    //               # oc get route -n ${c.ns} myapp-route -o jsonpath='{.spec.host}' > route-${c.name}.txt || true
+    //               oc logout || true
+    //             """
+    //           }
+    //         }
+    //       }
+    //     }
+    //   }
+    // }
 
     stage('Deploy haproxy') {
       steps {
@@ -98,7 +98,7 @@ pipeline {
           withCredentials([string(credentialsId: 'oc-token-1', variable: 'OC_TOKEN')]) {
             sh """
               oc login ${OC_SERVER} --token="${OC_TOKEN}" --insecure-skip-tls-verify=true
-              oc apply -f myapp-haproxy.yml
+              oc apply -n wirajayaabadi-dev -f myapp-haproxy.yml
               oc rollout status deploy/haproxy -n ${OC_NAMESPACE} --timeout=3m
               oc get route myapp-route -o jsonpath='{.spec.host}' > route-${OC_NAMESPACE}.txt || true
               oc logout || true
