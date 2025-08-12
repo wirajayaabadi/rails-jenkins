@@ -1,141 +1,186 @@
----
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: haproxy-config
-  labels:
-    app: haproxy
+  namespace: wirajayaabadi-dev
 data:
   haproxy.cfg: |
     global
-      log stdout format raw local0
-      daemon
+        daemon
+        maxconn 4096
+        log stdout local0 info
 
     defaults
-      mode http
-      log global
-      option httplog
-      timeout connect 5s
-      timeout client  60s
-      timeout server  60s
+        mode http
+        log global
+        option httplog
+        option dontlognull
+        timeout connect 5s
+        timeout client 30s
+        timeout server 30s
+        timeout http-request 10s
+        timeout http-keep-alive 2s
+        timeout check 10s
+        retries 3
+        option redispatch
+        balance roundrobin
 
-    # Expose a simple health endpoint on /healthz
-    frontend http_front
-      bind *:8080
-      acl is_health path_beg /healthz
-      http-request return status 200 content-type text/plain string "ok" if is_health
-      default_backend web_backends
+    frontend myapp_frontend
+        bind *:8080
+        default_backend myapp_servers
+        # Health check endpoint
+        monitor-uri /haproxy-health
 
-    backend web_backends
-      balance roundrobin
-      option httpchk GET /
-      http-check expect status 200-399
-      # Use cluster DNS for dynamic resolution (adjust IP if your cluster DNS differs)
-      resolvers osdns
-        nameserver dns1 172.30.0.10:53  # OpenShift default cluster-dns
-        hold valid 10s
-        resolve_retries       3
-        timeout resolve       5s
-        timeout retry         5s
-      # General health-check settings
-      default-server check inter 3s fall 2 rise 2 init-addr last,libc,none
+    backend myapp_servers
+        option httpchk GET /pages/hello
+        
+        # OpenShift cluster servers  
+        server app1 myapp-route-wirajayaabadi-dev.apps.rm2.thpm.p1.openshiftapps.com:443 check ssl verify none
+        server app2 myapp-route-biruswasana-dev.apps.rm1.0a51.p1.openshiftapps.com:443 check ssl verify none
+        server app3 myapp-route-fchbrnn-dev.apps.rm1.0a51.p1.openshiftapps.com:443 check ssl verify none
+        server app4 myapp-route-dianmatondang012-dev.apps.rm1.0a51.p1.openshiftapps.com:443 check ssl verify none
+        server app5 myapp-route-rafyryana-dev.apps.rm1.0a51.p1.openshiftapps.com:443 check ssl verify none
 
-      # --- HTTPS backends via OpenShift Routes ---
-      # We connect to 443 with SNI set to each route host. We skip cert validation since these are public route certs that may rotate.
-      server s1 myapp-route-wirajayaabadi-dev.apps.rm2.thpm.p1.openshiftapps.com:443 ssl verify none sni str(myapp-route-wirajayaabadi-dev.apps.rm2.thpm.p1.openshiftapps.com) resolvers osdns
-      server s2 myapp-route-biruswasana-dev.apps.rm1.0a51.p1.openshiftapps.com:443 ssl verify none sni str(myapp-route-biruswasana-dev.apps.rm1.0a51.p1.openshiftapps.com) resolvers osdns
-      server s3 myapp-route-fchbrnn-dev.apps.rm1.0a51.p1.openshiftapps.com:443 ssl verify none sni str(myapp-route-fchbrnn-dev.apps.rm1.0a51.p1.openshiftapps.com) resolvers osdns
-      server s4 myapp-route-dianmatondang012-dev.apps.rm1.0a51.p1.openshiftapps.com:443 ssl verify none sni str(myapp-route-dianmatondang012-dev.apps.rm1.0a51.p1.openshiftapps.com) resolvers osdns
-      server s5 myapp-route-rafyryana-dev.apps.rm1.0a51.p1.openshiftapps.com:443 ssl verify none sni str(myapp-route-rafyryana-dev.apps.rm1.0a51.p1.openshiftapps.com) resolvers osdns
+    # Statistics page
+    listen stats
+        bind *:8404
+        stats enable
+        stats uri /pages/hello
+        stats refresh 30s
+        stats admin if TRUE
 
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: haproxy
+  name: haproxy-lb
+  namespace: wirajayaabadi-dev
   labels:
-    app: haproxy
+    app: haproxy-lb
 spec:
   replicas: 2
   selector:
     matchLabels:
-      app: haproxy
+      app: haproxy-lb
   template:
     metadata:
       labels:
-        app: haproxy
+        app: haproxy-lb
     spec:
-      securityContext:
-        runAsNonRoot: true
-        runAsUser: 1001
       containers:
-        - name: haproxy
-          image: haproxy:2.9-alpine
-          imagePullPolicy: IfNotPresent
-          args: ['-f', '/usr/local/etc/haproxy/haproxy.cfg', '-db']
-          ports:
-            - name: http
-              containerPort: 8080
-          readinessProbe:
-            httpGet:
-              path: /healthz
-              port: 8080
-            initialDelaySeconds: 3
-            periodSeconds: 5
-          livenessProbe:
-            httpGet:
-              path: /healthz
-              port: 8080
-            initialDelaySeconds: 10
-            periodSeconds: 10
-          resources:
-            requests:
-              cpu: 50m
-              memory: 64Mi
-            limits:
-              cpu: 500m
-              memory: 256Mi
-          volumeMounts:
-            - name: haproxy-config
-              mountPath: /usr/local/etc/haproxy
-          securityContext:
-            allowPrivilegeEscalation: false
-      volumes:
+      - name: haproxy
+        image: haproxy:2.8-alpine
+        ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+        - containerPort: 8404
+          name: stats
+          protocol: TCP
+        volumeMounts:
         - name: haproxy-config
-          configMap:
-            name: haproxy-config
-            items:
-              - key: haproxy.cfg
-                path: haproxy.cfg
+          mountPath: /usr/local/etc/haproxy/haproxy.cfg
+          subPath: haproxy.cfg
+          readOnly: true
+        livenessProbe:
+          httpGet:
+            path: /haproxy-health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /haproxy-health
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          successThreshold: 1
+          failureThreshold: 3
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "500m"
+      volumes:
+      - name: haproxy-config
+        configMap:
+          name: haproxy-config
+      restartPolicy: Always
+
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: haproxy
+  name: haproxy-lb-service
+  namespace: wirajayaabadi-dev
   labels:
-    app: haproxy
+    app: haproxy-lb
 spec:
+  type: ClusterIP
   selector:
-    app: haproxy
+    app: haproxy-lb
   ports:
-    - name: http
-      port: 8080
-      targetPort: 8080
+  - name: http
+    port: 80
+    targetPort: 8080
+    protocol: TCP
+  - name: stats
+    port: 8404
+    targetPort: 8404
+    protocol: TCP
+
 ---
-# Optional: expose via OpenShift Route (edge-terminated TLS to HAProxy service)
 apiVersion: route.openshift.io/v1
 kind: Route
 metadata:
-  name: haproxy
+  name: haproxy-lb-route
+  namespace: wirajayaabadi-dev
   labels:
-    app: haproxy
+    app: haproxy-lb
 spec:
-  # host: custom-haproxy.<your-domain>   # (optional) set a custom host if you want a fixed URL
+  host: haproxy-lb-wirajayaabadi.apps.rm2.thpm.p1.openshiftapps.com
   to:
     kind: Service
-    name: haproxy
+    name: haproxy-lb-service
+    weight: 100
   port:
     targetPort: http
-  tls:
-    termination: edge
-    insecureEdgeTerminationPolicy: Redirect
+  wildcardPolicy: None
+
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: haproxy-stats-route
+  namespace: wirajayaabadi-dev
+  labels:
+    app: haproxy-lb
+spec:
+  host: haproxy-stats-wirajayaabadi.apps.rm2.thpm.p1.openshiftapps.com
+  to:
+    kind: Service
+    name: haproxy-lb-service
+    weight: 100
+  port:
+    targetPort: stats
+  wildcardPolicy: None
+
+---
+apiVersion: networking.k8s.io/v1
+
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: haproxy-lb-pdb
+  namespace: wirajayaabadi-dev
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: haproxy-lb
