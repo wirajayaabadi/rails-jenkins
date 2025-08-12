@@ -43,7 +43,7 @@ spec:
           hostPath:
       resources:
         requests:
-          memory: '768Mi' # Rails butuh memory tinggi
+          memory: '1024Mi' # Rails butuh memory tinggi
           cpu: '300m'
         limits:
           memory: '1.5Gi' # Beri headroom besar
