@@ -27,6 +27,9 @@ data:
 
     frontend myapp_frontend
         bind *:8080
+        # Redirect root path to /pages/hello
+        http-request redirect location /pages/hello if { path / }
+        
         default_backend myapp_servers
         # Health check endpoint
         monitor-uri /haproxy-health
