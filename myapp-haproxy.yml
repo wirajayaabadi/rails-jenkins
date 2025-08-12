@@ -32,15 +32,16 @@ data:
         monitor-uri /haproxy-health
 
     backend myapp_servers
-        # Disable health check temporarily for testing
-        # option httpchk GET /
+        # Health check using correct path
+        option httpchk GET /pages/hello
+        http-check expect status 200
         
-        # OpenShift cluster servers  
-        server app1 myapp-route-wirajayaabadi-dev.apps.rm2.thpm.p1.openshiftapps.com:443 ssl verify none
-        server app2 myapp-route-biruswasana-dev.apps.rm1.0a51.p1.openshiftapps.com:443 ssl verify none
-        server app3 myapp-route-fchbrnn-dev.apps.rm1.0a51.p1.openshiftapps.com:443 ssl verify none
-        server app4 myapp-route-dianmatondang012-dev.apps.rm1.0a51.p1.openshiftapps.com:443 ssl verify none
-        server app5 myapp-route-rafyryana-dev.apps.rm1.0a51.p1.openshiftapps.com:443 ssl verify none
+        # OpenShift cluster servers with health check
+        server app1 myapp-route-wirajayaabadi-dev.apps.rm2.thpm.p1.openshiftapps.com:443 check ssl verify none
+        server app2 myapp-route-biruswasana-dev.apps.rm1.0a51.p1.openshiftapps.com:443 check ssl verify none
+        server app3 myapp-route-fchbrnn-dev.apps.rm1.0a51.p1.openshiftapps.com:443 check ssl verify none
+        server app4 myapp-route-dianmatondang012-dev.apps.rm1.0a51.p1.openshiftapps.com:443 check ssl verify none
+        server app5 myapp-route-rafyryana-dev.apps.rm1.0a51.p1.openshiftapps.com:443 check ssl verify none
 
     # Statistics page
     listen stats

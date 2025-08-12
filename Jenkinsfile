@@ -25,7 +25,7 @@ pipeline {
           env.IMG_TAG = "build-${env.BUILD_NUMBER}-${commit}"
         }
         sh """
-          docker build --platform=linux/amd64 -t ${REGISTRY}/${IMAGE_NAME}:${IMG_TAG} .
+          docker build -t ${REGISTRY}/${IMAGE_NAME}:${IMG_TAG} .
         """
       }
     }
