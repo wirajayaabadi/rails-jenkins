@@ -80,6 +80,7 @@ pipeline {
                   mkdir -p "\$HOME"
                   oc login ${c.server} --token="${OC_TOKEN}" --insecure-skip-tls-verify=true
                   oc apply -n ${c.ns} -f myapp-secret.yml || true
+                  oc delete -n ${c.ns} -f myapp.rendered.yml
                   oc apply -n ${c.ns} -f myapp.rendered.yml
                   # oc rollout status -n ${c.ns} deploy/myapp-deployment --timeout=3m
                   # oc get route -n ${c.ns} myapp-route -o jsonpath='{.spec.host}' > route-${c.name}.txt || true
